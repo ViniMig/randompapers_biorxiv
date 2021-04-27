@@ -39,6 +39,7 @@ lastweek = today - timedelta(days=7)
 
 # make the request
 r=requests.get('https://api.biorxiv.org/details/biorxiv/'+ lastweek.strftime("%Y-%m-%d") +'/'+ today.strftime("%Y-%m-%d"))
+print(r.url)
 print('Response: ', r.status_code)
 out = r.json()
 # choose random numbers
@@ -61,9 +62,11 @@ for i in choice:
 	if num_authors == 2:
 		name2 = str(authors[1])
 		fp.write(' &amp; ' + name2.split(',')[0])
+	
+	fp.write(", Category: "+str(doc["category"]))
 	fp.write(', '+str(doc["date"]))
 	fp.write(", doi: "+str(doc["doi"]))
-	fp.write(", title: "+str(doc["title"]))
+	fp.write(", title: <a href=https://www.biorxiv.org/content/"+str(doc["doi"])+"v"+str(doc["version"])+">"+str(doc["title"])+"</a><br>")    
 	fp.write('</font></p>')
 	
 	namestring=''
