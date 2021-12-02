@@ -1,37 +1,20 @@
-import requests
+import requests, json
 import numpy as np
 from datetime import date
 from datetime import timedelta
-import os
-import time
-import glob
+import constants as cons
 
-api_key=''
-www_dir = './'
+#retrieve notion token and database id
+notion_token = cons.NOTION_TOKEN
+notion_database = cons.NOTION_DB_ID
+notion_headers = {
+    "Authorization": "Bearer " + notion_token,
+    "Content-Type": "application/json",
+    "Notion-Version": "2021-08-16"
+	}
 
-# Rename the index.html file using its creation date
-try:
-	previous_fname = time.strftime("%Y_%m_%d.html",time.localtime(os.path.getmtime(www_dir+'index.html')))
-	os.rename(www_dir+'index.html',www_dir+previous_fname)
-except:
-	pass
 
-# Open a new index.html file and write the header
-fp = open(www_dir+"index.html","w")
-
-fp.write('''<html>
-  <head>
-	<meta name="viewport" content="width/device-width" charset="utf-8">
-  	<title>Random Papers</title>
-	<link rel="stylesheet" href="style.css">
-  </head>
-  <body>
-  <div class="heading">
-  <h1>Random Papers</h1>
-  </div>
-  <div class="container">''')
-
-fp.write("<h4>This week's papers</h4>")
+#random papers code and notion implementation
 
 # Work out the month and year to search
 today = date.today()
@@ -39,68 +22,385 @@ lastweek = today - timedelta(days=7)
 
 # make the request
 r=requests.get('https://api.biorxiv.org/details/biorxiv/'+ lastweek.strftime("%Y-%m-%d") +'/'+ today.strftime("%Y-%m-%d"))
-print(r.url)
-print('Response: ', r.status_code)
 out = r.json()
-# choose random numbers
+
+# choose random numbers from the range of results
 num_papers=out["messages"][0]["count"]
 choice = np.random.choice(num_papers,5,replace=False)
 print("num_papers, choice=",num_papers,choice)
 
-# print out the info about the chosen papers
+# setup notion page object information
 docs = out["collection"]
 choice_count = 1
+author_names = []
+categories = []
+
+#create list of notion children objects, append individual papers and remarks afterwards
+notion_page_children = [{
+				"object": "block",
+				"type": "heading_1",
+				"heading_1": {
+					"text": [{ "type": "text", "text": { "content": "Random Papers" } }]
+					}
+			},
+			{
+				"object": "block",
+				"type": "divider",
+				"divider": {}
+			},
+			{
+				"object": "block",
+				"type": "heading_3",
+				"heading_3": {
+					"text": [
+						{ "type": "text",
+					      "text": {
+							  "content": "This week's papers"
+							  },
+						  "annotations": {
+							  "bold": True,
+							  "color": "blue_background"
+							  }
+						  }
+						]
+				}
+			}] 
+
+#iterate through the selected results and create notion objects with the information about the papers
 for i in choice:
 	doc = docs[i]
-	fp.write("<h4>Category: "+str(doc["category"])+" </h4>")
-	authors = list(doc["authors"].split(";"))
-    
-	num_authors = len(authors)
+	
+	categories.append({"name": str(doc["category"])}) #set categories for tags of each week's papers
+	authors = list(doc["authors"].split(";")) #get list of authors
+	num_authors = len(authors) #determine how many authors in each paper for representation purposes
 	name = str(authors[0])
-	fp.write(name.split(',')[0])
+	authors_var = name.split(',')[0]
+	
+	#if several authors add et al if only 2 add both if only 1 var will contain first name already
 	if num_authors > 2:
-		fp.write(' et al. ')
+		authors_var += " et al. " 
+		
 	if num_authors == 2:
 		name2 = str(authors[1])
-		fp.write(' &amp; ' + name2.split(',')[0])
+		authors_var += " & " + name2.split(',')[0]
 	
-	fp.write(', '+str(doc["date"]))
-	fp.write(", doi: "+str(doc["doi"]))
-	fp.write(", title: <a href=https://www.biorxiv.org/content/"+str(doc["doi"])+"v"+str(doc["version"])+">"+str(doc["title"])+"</a><br>")    
-	fp.write('</font></p>')
+	#create 5 children consisting on 5 toggles and each with one to-do child
+	notion_page_children.append({
+				"object": "block",
+				"type": "toggle",
+				"toggle": {
+					   "text": [{
+						        "type": "text",
+								     "text": {
+										 "content": str(doc["category"]) + ": " + authors_var + ", " + str(doc["date"])
+										 },
+									 "annotations": {
+										 "bold": True,
+										 "color": "green_background"
+										 }
+									 }],
+					   "children":[{
+						   "type": "to_do",
+						   "to_do": {
+							      "text": [{
+									        "type": "text",
+											"text": {
+												"content": "DOI: "
+												},
+											"annotations": {
+												"bold": True
+												}												
+											},
+									        {
+									        "type": "text",
+											"text": {
+												"content": str(doc["doi"])
+												}												
+											},
+											{
+											"type": "text",
+											"text": {
+												"content": "  Title: "
+												},
+											"annotations": {
+												"bold": True
+												}
+											},
+									        {
+											"type": "text",
+											"text": {
+												"content": str(doc["title"]),
+												"link": {
+													"url": "https://www.biorxiv.org/content/" + str(doc["doi"]) + "v" + str(doc["version"])
+													}
+												}
+											}
+											],
+								  "checked": False
+								  }	
+						   }]
+				}
+			})
 	
-	namestring=''
 	for name in authors:
-		namestring = namestring + name + ', '
-	choice_count+=1
+		author_names.append({"name": name.replace(',', '')})#set for author tags in each week's papers
+	
+	choice_count+=1#don't remember why i have this count here, must be important (probably not)
 
-# summary information
-fp.write("<br><p>Selected on %s, %d %s from a total of %d papers published last week in Biorxiv</p>" % (today.strftime("%A"),today.day,today.strftime("%B %Y"),num_papers))
+#add a division
+notion_page_children.append(
+	{
+	  "object": "block",
+	  "type": "divider",
+	  "divider": {}
+	  }
+)
+#description
+notion_page_children.append(
+	{
+	  "object": "block",
+	  "type": "paragraph",
+	  "paragraph": {
+		  "text": [
+			  {
+				  "type": "text",
+				  "text": {
+					  "content": "Papers selected out of a total of " + str(num_papers) + " papers published in Biorxiv on the week of " + str(lastweek.day) + " - " + str(today.day) + " " + today.strftime("%B %Y")
+					  }
+				  }
+			  ]
+		  }
+	  }
+)
+#remarks about  original Random Papers and reference to sources
+notion_page_children.append(
+	{
+	  "object": "block",
+	  "type": "paragraph",
+	  "paragraph": {
+		  "text": [
+			  {
+				  "type": "text",
+				  "text": {
+					  "content": "This uses an adaptation of the code used for Random Papers by McGill Space Institute, please refer to the code below"
+					  },
+				  "annotations": {
+					  "bold": True
+					  }
+				  }
+			  ]
+		  }
+	  }
+)
+notion_page_children.append(
+	{
+	  "object": "block",
+	  "type": "heading_3",
+	  "heading_3": {
+		  "text": [
+			  {
+				  "type": "text",
+				  "text": {
+					  "content": "About Random Papers"
+					  },
+				  "annotations": {
+					  "bold": True,
+					  "color": "blue"
+					  }
+				  }
+			  ]
+		  }
+	  }
+)
+notion_page_children.append(
+	{
+	  "object": "block",
+	  "type": "paragraph",
+	  "paragraph": {
+		  "text": [
+			  {
+				  "type": "text",
+				  "text": {
+					  "content": "We meet every second Monday at noon at the "
+					  },
+				  "annotations": {
+					  "italic": True
+					  }
+				  },
+			  {
+				  "type": "text",
+				  "text": {
+					  "content": "McGill Space Institute",
+					  "link": {
+						  "url": "http://msi.mcgill.ca/"
+						  }
+					  },
+				  "annotations": {
+					  "italic": True
+					  }
+			    },
+			  {
+				  "type": "text",
+				  "text": {
+					  "content": " to discuss 5 random astrophysics papers."
+					  },
+				  "annotations": {
+					  "italic": True
+					  }
+				  }
+			  ]
+		  }
+	  }
+)	
+notion_page_children.append(
+	{
+	  "object": "block",
+	  "type": "paragraph",
+	  "paragraph": {
+		  "text": [
+			  {
+				  "type": "text",
+				  "text": {
+					  "content": "The goal of Random Papers is to gain a broad view of current astrophysics research. For each meeting, we run a script to choose 5 random papers published in the last month in refereed astrophysics journals. This gives a different slice of the literature than the typical astro-ph discussion, with papers from outside our own research areas or those that might not otherwise be chosen for discussion."
+					  },
+				  "annotations": {
+					  "italic": True
+					  }
+				  }
+			  ]
+		  }
+	  }
+)
+notion_page_children.append(
+	{
+	  "object": "block",
+	  "type": "paragraph",
+	  "paragraph": {
+		  "text": [
+			  {
+				  "type": "text",
+				  "text": {
+					  "content": "Rather than reading each paper in depth, the goal is to focus on the big picture, with questions such as: How would we summarize the paper in a few sentences? What are the key figures in the paper? What analysis methods are used? Why is this paper being written, and Why now?"
+					  },
+				  "annotations": {
+					  "italic": True
+					  }
+				  }
+			  ]
+		  }
+	  }
+)
+notion_page_children.append(
+	{
+	  "object": "block",
+	  "type": "paragraph",
+	  "paragraph": {
+		  "text": [
+			  {
+				  "type": "text",
+				  "text": {
+					  "content": "Code: "
+					  },
+				  "annotations": {
+					  "italic": True
+					  }
+				  },
+			  {
+				  "type": "text",
+				  "text": {
+					  "content": "GitHub",
+					  "link": {
+						  "url": "https://github.com/andrewcumming/randompapers"
+						  }
+					  },
+				  "annotations": {
+					  "italic": True
+					  }
+			    }
+			  ]
+		  }
+	  }
+)	
 
-# make a list of previous random papers
-# fp.write("<h4>Previous random papers</h4>")
+##define functions for notion
 
-# file_list = glob.glob(www_dir+'*.html')
-# file_list = [os.path.basename(file) for file in file_list]
-# file_list.sort(reverse=True)
-# for fname in file_list:
-# 	if fname!='index.html':
-# 		fp.write('<a href="'+fname+'">'+fname.replace("_",".")[:-5]+'</a> ')
+#read database, this will be used to obtain the page ids and iteratively update the status for existing one
+def read_database():
+	readUrl = 'https://api.notion.com/v1/databases/' + notion_database + '/query'
+	resDB = requests.request("POST", readUrl, headers = notion_headers)
+	resDB_json = resDB.json()
+	return(resDB_json)
 
-# About
-fp.write("<h4>This uses an adaptation of the code used for Random Papers, please refer to the code at the bottom</h4>")
-fp.write("<h3>About Random Papers</h3>")
-fp.write('''<p style="font-size:18px;font-style:italic;">We meet every second Monday at noon at the <a href="http://msi.mcgill.ca/">McGill Space Institute</a> to discuss 5 random astrophysics papers.</p>
-<p style="font-size:18px;font-style:italic;">The goal of Random Papers is to gain a broad view of current astrophysics research. For each meeting, we run a script to choose 5 random papers published in the last month in refereed astrophysics journals. This gives a different slice of the literature than the typical astro-ph discussion, with papers from outside our own research areas or those that might not otherwise be chosen for discussion.</p>
-<p style="font-size:18px;font-style:italic;">Rather than reading each paper in depth, the goal is to focus on the big picture, with questions such as: How would we summarize the paper in a few sentences? What are the key figures in the paper? What analysis methods are used? Why is this paper being written, and Why now?
-</p>
-''')
+#function for crfeation of the new page with retrieved Biorxiv data	
+def create_page():
+	createUrl = "https://api.notion.com/v1/pages"
+	new_page_data = {
+		"parent": {"database_id": notion_database},
+		"properties": {
+            "Week": {
+                "title": [
+                    {
+                        "text": {
+                            "content": str(lastweek.day) + " - " + str(today.day) + " " + today.strftime("%B %Y")
+                        }
+                    }
+                ]
+            },
+            "Status": {
+                "multi_select": [
+                    {
+                        "name": "New"
+                    }
+                ]
+            },
+			"Tags":{
+				"multi_select": categories
+				},
+			"Author":{
+				"multi_select": author_names
+				}
+        },
+		"children": notion_page_children
+	}
+	data = json.dumps(new_page_data)
+	res = requests.request("POST", createUrl, headers=notion_headers, data=data)
+	print("Page created status code: " + str(res.status_code))
 
-fp.write('''<p><br>
-Image credit: <a href="https://www.nasa.gov/image-feature/celestial-fireworks">NASA/HST</a><br>
-Code: <a href="https://github.com/andrewcumming/randompapers">GitHub</a><br>
-<a href="feed.xml">RSS</a>
-</p>''')
-fp.write("</div></body></html>")
 
-fp.close()
+#function to be used to update status property
+def update_page(page_id):
+	
+	updateUrl = "https://api.notion.com/v1/pages/" + page_id
+	
+	updateData = {
+        "properties": {
+            "Status": {
+                "multi_select": [
+                    {
+                        "name": "Past"
+                    }
+                ]
+            }        
+        }
+    }
+	
+	data = json.dumps(updateData)
+	updt_response = requests.request("PATCH", updateUrl, headers=notion_headers, data=data)
+	print("Page update status code: " + str(updt_response.status_code))
+#end of functions definition
+
+
+def main():
+	
+	#Verify if pages exist in DB and update Status of the last added page (first in the list) to Past
+	dbjson = read_database()
+	if len(dbjson["results"]) > 0:
+		pageID = dbjson["results"][0]["id"]
+		update_page(pageID)
+	else:
+		print("Empty database, no tags to update")
+	#Add new page
+	create_page()
+
+#call main
+main()
