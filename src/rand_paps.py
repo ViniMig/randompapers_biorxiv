@@ -147,16 +147,14 @@ for i in choice:
 	
 	choice_count+=1#don't remember why i have this count here, must be important (probably not)
 
-#add a division
-notion_page_children.append(
-	{
+#add a division and original random papers reference remarks
+notion_page_children.extend(
+	[{
 	  "object": "block",
 	  "type": "divider",
 	  "divider": {}
-	  }
-)
+	  },
 #description
-notion_page_children.append(
 	{
 	  "object": "block",
 	  "type": "paragraph",
@@ -170,10 +168,9 @@ notion_page_children.append(
 				  }
 			  ]
 		  }
-	  }
-)
+	  },
+	
 #remarks about  original Random Papers and reference to sources
-notion_page_children.append(
 	{
 	  "object": "block",
 	  "type": "paragraph",
@@ -190,9 +187,7 @@ notion_page_children.append(
 				  }
 			  ]
 		  }
-	  }
-)
-notion_page_children.append(
+	  },
 	{
 	  "object": "block",
 	  "type": "heading_3",
@@ -210,9 +205,7 @@ notion_page_children.append(
 				  }
 			  ]
 		  }
-	  }
-)
-notion_page_children.append(
+	  },
 	{
 	  "object": "block",
 	  "type": "paragraph",
@@ -250,9 +243,7 @@ notion_page_children.append(
 				  }
 			  ]
 		  }
-	  }
-)	
-notion_page_children.append(
+	  },	
 	{
 	  "object": "block",
 	  "type": "paragraph",
@@ -269,9 +260,7 @@ notion_page_children.append(
 				  }
 			  ]
 		  }
-	  }
-)
-notion_page_children.append(
+	  },
 	{
 	  "object": "block",
 	  "type": "paragraph",
@@ -288,9 +277,7 @@ notion_page_children.append(
 				  }
 			  ]
 		  }
-	  }
-)
-notion_page_children.append(
+	  },
 	{
 	  "object": "block",
 	  "type": "paragraph",
@@ -320,7 +307,7 @@ notion_page_children.append(
 			  ]
 		  }
 	  }
-)	
+])
 
 ##define functions for notion
 
