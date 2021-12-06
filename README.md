@@ -50,7 +50,7 @@ As the names suggest these are your specific Notion token and database id upon c
 
 Future ideas
 ---
-From some feedback by posting on reddit an idea is to allow for retrieval of papers by doi. This will most likely be the next step of this project. Additional to this, maybe wouldn't be so bad to try and implement this with an executable and a first basic UI to allow for input of things such as: **Notion token**, **Notion database id**, **mode select** (random | get specific paper),**doi**, **...**. The first 2 I may rethink them as it will become a very repètitive process to input the same 2 keys all the time vs having them stored locally, an hybrid solution may be better.
+From some feedback by posting on reddit an idea is to allow for retrieval of papers by doi. This will most likely be the next step of this project. Additional to this, maybe wouldn't be so bad to try and implement this with an executable and a first basic UI to allow for input of things such as: **Notion token**, **Notion database id**, **mode select** (random | get specific paper),**doi**, **...**. The first 2 I may rethink them as it will become a very repetitive process to input the same 2 keys all the time vs having them stored locally, an hybrid solution may be better, where the script checks for a credentials file and in case it doesn't exist request the values to the user and generate one.
 
 One idea in the back of my mind is to also try to implement some kind of statistics such as "favoured category" or "hottest keyword in titles read", or some other things i may think of.
 
